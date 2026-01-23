@@ -73,6 +73,22 @@ node scripts/faust2wasm.js test/poly.dsp test/out -poly
 ```
 will create a set of files: `index.js`, `dsp-module.wasm`, `dsp-meta.json`, `index.html` (and possibly `effect-module.wasm`, `effect-meta.json`) in the `out` folder.
 
+##### Local include files and `-I`
+
+The CLI runs the Faust compiler inside a WebAssembly in-memory filesystem, so it cannot read your host filesystem directly. To make local `import("something.lib")` work:
+
+- The directory that contains the input `.dsp` is automatically copied into the in-memory FS and added to the compiler include path.
+- Any `-I <dir>` (or `-Idir`) you pass is mirrored into the in-memory FS and added to the include path.
+- Only `.dsp` and `.lib` files are mirrored.
+
+This means you can run the CLI from any working directory as long as your local includes live next to the DSP or are listed with `-I`.
+
+Example:
+
+```bash
+node scripts/faust2wasm.js -I test/includes test/something.dsp test/out
+```
+
 #### Creating a Progressive Web Application (PWA) of a Faust DSP
 
 You can create a standalone Progressive Web Application using the command line:
@@ -365,6 +381,3 @@ Html pages embedding the Faust compiler must be served using https, unless using
 
 ----
 <a href="http://faust.grame.fr"><img src=https://faust.grame.fr/community/logos/img/LOGO_FAUST_COMPLET_ORANGE.png width=200 /></a>
-
-
-

@@ -38,6 +38,92 @@ const faust2wasmFiles = async (
 
     const fileName = /** @type {string} */ (inputFile.split('/').pop());
     const dspName = fileName.replace(/\.dsp$/, '');
+    // Step 1: get the compiler's in-memory FS (host FS is not visible to WASM).
+    const faustFs = compiler.fs();
+    const inputDir = path.dirname(path.resolve(inputFile));
+    // Step 2: split include flags from other args so we can remap include paths.
+    const parseIncludeArgs = (args) => {
+        const includeDirs = [];
+        const otherArgs = [];
+        for (let i = 0; i < args.length; i += 1) {
+            const arg = args[i];
+            if (arg === '-I' && args[i + 1]) {
+                includeDirs.push(args[i + 1]);
+                i += 1;
+                continue;
+            }
+            if (arg.startsWith('-I') && arg.length > 2) {
+                includeDirs.push(arg.slice(2));
+                continue;
+            }
+            otherArgs.push(arg);
+        }
+        return { includeDirs, otherArgs };
+    };
+    // Step 3: helpers to build the in-memory include tree.
+    const ensureFsDir = (dir) => {
+        try {
+            faustFs.mkdirTree(dir);
+        } catch {}
+    };
+    const isFaustSource = (filePath) => {
+        const ext = path.extname(filePath).toLowerCase();
+        return ext === '.lib' || ext === '.dsp';
+    };
+    // Step 4: mirror a host include directory into the in-memory FS.
+    const copyIncludeDirToFs = (srcDir, destDir) => {
+        if (!fs.existsSync(srcDir) || !fs.statSync(srcDir).isDirectory()) return;
+        const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+        for (const entry of entries) {
+            const srcPath = path.join(srcDir, entry.name);
+            const destPath = path.posix.join(destDir, entry.name);
+            if (entry.isDirectory()) {
+                copyIncludeDirToFs(srcPath, destPath);
+                continue;
+            }
+            if (!entry.isFile() || !isFaustSource(srcPath)) continue;
+            ensureFsDir(path.posix.dirname(destPath));
+            faustFs.writeFile(destPath, fs.readFileSync(srcPath));
+        }
+    };
+    // Step 5: parse include args and build a unified include list.
+    const { includeDirs: rawIncludeDirs, otherArgs } = parseIncludeArgs(argv);
+    const includeDirs = [];
+    const seenHostDirs = new Set();
+    const seenFsDirs = new Set();
+    const addIncludeDir = (dir) => {
+        if (!dir) return;
+        const resolved = path.resolve(dir);
+        if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+            if (seenHostDirs.has(resolved)) return;
+            seenHostDirs.add(resolved);
+            includeDirs.push({ type: 'host', path: resolved });
+            return;
+        }
+        if (seenFsDirs.has(dir)) return;
+        seenFsDirs.add(dir);
+        includeDirs.push({ type: 'fs', path: dir });
+    };
+    // Step 6: always include the DSP's directory, then user-provided -I dirs.
+    addIncludeDir(inputDir);
+    rawIncludeDirs.forEach(addIncludeDir);
+    // Step 7: map host include dirs into /faust/user/incN in the in-memory FS.
+    const memfsIncludeDirs = [];
+    let includeIndex = 0;
+    for (const includeDir of includeDirs) {
+        if (includeDir.type === 'fs') {
+            memfsIncludeDirs.push(includeDir.path);
+            continue;
+        }
+        const memfsDir = path.posix.join('/faust', 'user', `inc${includeIndex}`);
+        includeIndex += 1;
+        copyIncludeDirToFs(includeDir.path, memfsDir);
+        memfsIncludeDirs.push(memfsDir);
+    }
+    // Step 8: rewrite argv to use only in-memory include paths.
+    argv.length = 0;
+    memfsIncludeDirs.forEach((dir) => argv.push('-I', dir));
+    argv.push(...otherArgs);
     // Flush to zero to avoid costly denormalized numbers
     argv.push('-ftz', '2');
     const dspModulePath = path.join(outputDir, `dsp-module.wasm`);

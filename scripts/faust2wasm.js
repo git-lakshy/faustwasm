@@ -6,7 +6,7 @@ import { copyWebStandaloneAssets, copyWebPWAAssets, copyWebTemplateAssets } from
 
 const argv = process.argv.slice(2);
 
-if (argv[0] === "-help" || argv[0] === "-h") {
+if (argv.includes("-help") || argv.includes("-h")) {
     console.log(`
 faust2wasm.js <file.dsp> <outputDir> [-poly] [-standalone] [-pwa] [-no-template]
 Generates WebAssembly and metadata JSON files of a given Faust DSP.
@@ -14,23 +14,41 @@ Generates WebAssembly and metadata JSON files of a given Faust DSP.
     process.exit();
 }
 
-const $poly = argv.indexOf("-poly");
-const poly = $poly !== -1;
-if (poly) argv.splice($poly, 1);
+const takeFlag = (flag) => {
+    const index = argv.indexOf(flag);
+    if (index === -1) return false;
+    argv.splice(index, 1);
+    return true;
+};
+const poly = takeFlag("-poly");
+const standalone = takeFlag("-standalone");
+const pwa = takeFlag("-pwa");
+const noTemplate = takeFlag("-no-template");
 
-const $standalone = argv.indexOf("-standalone");
-const standalone = $standalone !== -1;
-if (standalone) argv.splice($standalone, 1);
-
-const $pwa = argv.indexOf("-pwa");
-const pwa = $pwa !== -1;
-if (pwa) argv.splice($pwa, 1);
-
-const $noTemplate = argv.indexOf("-no-template");
-const noTemplate = $noTemplate !== -1;
-if (noTemplate) argv.splice($noTemplate, 1);
-
-const [inputFile, outputDir, ...argvFaust] = argv;
+// Allow Faust flags (like -I) anywhere while keeping the first two positionals as input/output.
+const positionals = [];
+const argvFaust = [];
+for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "-I" && argv[i + 1]) {
+        argvFaust.push(arg, argv[i + 1]);
+        i += 1;
+        continue;
+    }
+    if (arg.startsWith("-I") && arg.length > 2) {
+        argvFaust.push(arg);
+        continue;
+    }
+    if (positionals.length < 2 && !arg.startsWith("-")) {
+        positionals.push(arg);
+        continue;
+    }
+    argvFaust.push(arg);
+}
+const [inputFile, outputDir] = positionals;
+if (!inputFile || !outputDir) {
+    throw new Error("Usage: faust2wasm.js <file.dsp> <outputDir> [faust args...]");
+}
 const fileName = inputFile.split('/').pop();
 if (!fileName) throw new Error("No input DSP file");
 const dspName = fileName.replace(/\.dsp$/, '');
