@@ -10,6 +10,28 @@ import {
 } from '../dist/esm/index.js';
 import { fileURLToPath } from 'url';
 
+// Include handling overview (WASM compiler only sees its in-memory FS):
+// 1) Grab the Faust FS via compiler.fs() and compute inputDir from inputFile.
+// 2) Parse include args with parseIncludeArgs(argv):
+//    - Collects only `-I <dir>` into includeDirs.
+//    - Preserves non-include args as otherArgs.
+// 3) Helper utilities:
+//    - ensureFsDir(dir) creates in-memory directories via mkdirTree (errors ignored).
+//    - isFaustSource(filePath) filters to .lib/.dsp files.
+//    - copyIncludeDirToFs(srcDir, destDir) mirrors Faust sources into the in-memory FS.
+// 4) Build include list:
+//    - Always add inputDir.
+//    - Add any user-provided `-I` dirs.
+//    - Classify each include as host (disk) or fs (already in-memory).
+// 5) Mirror host includes into the in-memory FS:
+//    - Map each host include to /faust/user/incN.
+//    - Copy sources into that path.
+//    - Record the mapped in-memory include dir.
+// 6) Rewrite argv to only use in-memory include dirs:
+//    - Clear argv.
+//    - Add `-I /faust/user/incN` (and any original fs include dirs).
+//    - Append otherArgs, then `-ftz 2` as usual.
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const __filename = fileURLToPath(import.meta.url);
 
