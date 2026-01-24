@@ -78,7 +78,7 @@ will create a set of files: `index.js`, `dsp-module.wasm`, `dsp-meta.json`, `ind
 The CLI runs the Faust compiler inside a WebAssembly in-memory filesystem, so it cannot read your host filesystem directly. To make local `import("something.lib")` work:
 
 - The directory that contains the input `.dsp` is automatically copied into the in-memory FS and added to the compiler include path.
-- Any `-I <dir>` (or `-Idir`) you pass is mirrored into the in-memory FS and added to the include path.
+- Any `-I <dir>` you pass is mirrored into the in-memory FS and added to the include path.
 - Only `.dsp` and `.lib` files are mirrored.
 
 This means you can run the CLI from any working directory as long as your local includes live next to the DSP or are listed with `-I`.

@@ -35,10 +35,6 @@ for (let i = 0; i < argv.length; i += 1) {
         i += 1;
         continue;
     }
-    if (arg.startsWith("-I") && arg.length > 2) {
-        argvFaust.push(arg);
-        continue;
-    }
     if (positionals.length < 2 && !arg.startsWith("-")) {
         positionals.push(arg);
         continue;

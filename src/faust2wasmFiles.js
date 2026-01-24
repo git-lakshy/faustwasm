@@ -52,10 +52,6 @@ const faust2wasmFiles = async (
                 i += 1;
                 continue;
             }
-            if (arg.startsWith('-I') && arg.length > 2) {
-                includeDirs.push(arg.slice(2));
-                continue;
-            }
             otherArgs.push(arg);
         }
         return { includeDirs, otherArgs };
