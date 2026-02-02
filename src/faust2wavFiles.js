@@ -52,7 +52,12 @@ const faust2wavFiles = async (
     let input = undefined;
     if (inputWav) {
         console.log(`Reading input wav file ${inputWav}.`);
-        const inputBuffer = fs.readFileSync(inputWav).buffer;
+        const inputBufferView = fs.readFileSync(inputWav);
+        // Slice to the exact Buffer view to avoid extra bytes from the backing ArrayBuffer.
+        const inputBuffer = inputBufferView.buffer.slice(
+            inputBufferView.byteOffset,
+            inputBufferView.byteOffset + inputBufferView.byteLength
+        );
         console.log(`Decoding...`);
         input = WavDecoder.decode(inputBuffer).channelData;
     }

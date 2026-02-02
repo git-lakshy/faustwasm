@@ -1040,7 +1040,9 @@ export class FaustBaseWebAudioDsp implements IFaustBaseWebAudioDsp {
             .split(';')
             .map((str) =>
                 str.length <= 2 ? '' : str.substring(1, str.length - 1)
-            );
+            )
+            .map((str) => str.trim())
+            .filter((str) => str.length > 0);
     }
 
     get hasAccInput() {

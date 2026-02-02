@@ -273,7 +273,7 @@ export class FaustOfflineProcessor<Poly extends boolean = false> {
                     outputs[i].set(output, l);
                 }
             }
-            l += this.fBufferSize;
+            l += sliceLength;
             onUpdate?.(l);
         }
         // The node can be stopped after rendering

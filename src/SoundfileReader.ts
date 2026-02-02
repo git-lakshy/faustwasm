@@ -64,32 +64,13 @@ class SoundfileReader {
             if (item.type === 'soundfile') {
                 const urls = FaustBaseWebAudioDsp.splitSoundfileNames(item.url);
                 // soundfiles.map[item.label] = urls;
-                urls.forEach((url) => (soundfiles[url] = null));
+                urls.filter((url) => url.trim().length > 0)
+                    .forEach((url) => (soundfiles[url] = null));
             }
         };
         FaustBaseWebAudioDsp.parseUI(dspMeta.ui, callback);
         return soundfiles;
     }
-    /**
-     * Check if the file exists.
-     *
-     * @param url : the url of the file to check
-     * @returns : true if the file exists, otherwise false
-     */
-    private static async checkFileExists(url: string): Promise<boolean> {
-        try {
-            console.log(`"checkFileExists" url: ${url}`);
-            // Fetch in "HEAD" mode does not properly work with the service-worker.js cache, so use "GET" mode for now
-            //const response = await fetch(url, { method: "HEAD" });
-            const response = await fetch(url);
-            console.log(`"checkFileExists" response.ok: ${response.ok}`);
-            return response.ok; // Will be true if the status code is 200-299
-        } catch (error) {
-            console.error('Fetch error:', error);
-            return false;
-        }
-    }
-
     /**
      * Fetch the soundfile.
      *
@@ -136,17 +117,21 @@ class SoundfileReader {
                         .href
             )
         ];
-        const checkResults = await Promise.all(
-            urlsToCheck.map((url) => this.checkFileExists(url))
-        );
-        const successIndex = checkResults.findIndex((r) => !!r);
-        if (successIndex === -1)
-            throw new Error(
-                `Failed to load sound file ${filename}, all check failed.`
-            );
-        soundfiles![filename] = await this.fetchSoundfile(
-            urlsToCheck[successIndex],
-            audioCtx
+        // Try each candidate once to avoid double downloads (no preflight GET).
+        let lastError: unknown = null;
+        for (const url of urlsToCheck) {
+            try {
+                soundfiles![filename] = await this.fetchSoundfile(
+                    url,
+                    audioCtx
+                );
+                return;
+            } catch (error) {
+                lastError = error;
+            }
+        }
+        throw new Error(
+            `Failed to load sound file ${filename}, all check failed. Last error: ${String(lastError)}`
         );
     }
 
